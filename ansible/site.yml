@@ -1,0 +1,58 @@
+---
+# Clickhouse play
+- name: Install Clickhouse
+  hosts: clickhouse
+  handlers:
+    - name: Start clickhouse service
+      become: true
+      ansible.builtin.service:
+        name: clickhouse-server
+        state: restarted
+  tasks:
+    - block:
+        - name: Install Clickhouse | Download distrib noarch
+          ansible.builtin.get_url:
+            url: "https://packages.clickhouse.com/rpm/stable/{{ item }}-{{ clickhouse_version }}.noarch.rpm"
+            dest: "./{{ item }}-{{ clickhouse_version }}.rpm"
+            mode: 0644
+          with_items: "{{ clickhouse_packages_noarch }}"
+        - name: Install Clickhouse | Download distrib x86_64
+          ansible.builtin.get_url:
+            url: "https://packages.clickhouse.com/rpm/stable/{{ item }}-{{ clickhouse_version }}.x86_64.rpm"
+            dest: "./{{ item }}-{{ clickhouse_version }}.rpm"
+            mode: 0644
+          with_items: "{{ clickhouse_packages_x86_64 }}"
+    - name: Install Clickhouse | Install packages
+      become: true
+      ansible.builtin.yum:
+        name:
+          - clickhouse-common-static-{{ clickhouse_version }}.rpm
+          - clickhouse-client-{{ clickhouse_version }}.rpm
+          - clickhouse-server-{{ clickhouse_version }}.rpm
+      notify: Start clickhouse service
+  post_tasks:
+    - block:
+      - name: Install Clickhouse | Wait for clickhouse to be running
+        ansible.builtin.service_facts:
+        register: actual_services_state
+        until: actual_services_state.ansible_facts.services['clickhouse-server.service'].state == 'running'
+        retries: 10
+        delay: 500
+    - name: Install Clickhouse | Create database
+      ansible.builtin.command: "clickhouse-client -q 'create database logs;'"
+      register: create_db
+      failed_when: create_db.rc != 0 and create_db.rc !=82
+      changed_when: create_db.rc == 0
+# Vector play
+- name: Install Vector
+  hosts: vector
+  tasks:
+    - name: Install Vector | Download distrib
+      ansible.builtin.get_url:
+        url: "https://packages.timber.io/vector/{{ vector_version }}/vector-{{ vector_version }}-1.x86_64.rpm"
+        dest: "./vector-{{ vector_version }}.rpm"
+        mode: 0644
+    - name: Install Vector | Install packages
+      become: true
+      ansible.builtin.yum:
+        name: "vector-{{ vector_version }}.rpm"

@@ -1,0 +1,13 @@
+---
+clickhouse:
+  hosts:
+    clickhouse-01:
+      ansible_host: "51.250.2.168"
+  vars:
+    ansible_user: centos
+vector:
+  hosts:
+    application-01:
+      ansible_host: "51.250.82.119"
+  vars:
+    ansible_user: centos
