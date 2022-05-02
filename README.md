@@ -27,27 +27,28 @@
       * `dest: "./{{ item }}-{{ clickhouse_version }}.rpm"`
       * `mode: 0644`
     * `with_items: "{{ clickhouse_packages_x86_64 }}"` - выполнить по всем элементам, находящимся в списке clickhouse_packages_noarch (т.е. clickhouse-common-static)
-  - name: Install Clickhouse | Install packages
-    become: true
-    ansible.builtin.yum:
-      name:
-        - clickhouse-common-static-{{ clickhouse_version }}.rpm
-        - clickhouse-client-{{ clickhouse_version }}.rpm
-        - clickhouse-server-{{ clickhouse_version }}.rpm
-    notify: Start clickhouse service
-post_tasks:
-  - block:
-    - name: Install Clickhouse | Wait for clickhouse to be running
-      ansible.builtin.service_facts:
-      register: actual_services_state
-      until: actual_services_state.ansible_facts.services['clickhouse-server.service'].state == 'running'
-      retries: 10
-      delay: 500
-  - name: Install Clickhouse | Create database
-    ansible.builtin.command: "clickhouse-client -q 'create database logs;'"
-    register: create_db
-    failed_when: create_db.rc != 0 and create_db.rc !=82
-    changed_when: create_db.rc == 0
+  * Следующия задача - установка трёх скачанных пакетов `name: Install Clickhouse | Install packages`
+    * `become: true` - повышаем привилегии до root
+    * `ansible.builtin.yum:` - устанавливаем скачанный на предыдущем шаге пакет с помощью модуля yum
+      * `name:` - список устанавливаемых пакетов с подстановкой переменных из того же [group_vars/clickhouse/vars.yml](./ansible/group_vars/clickhouse/vars.yml); в принципе можно было сделать и с помощью `with_items` или `loop`
+        * `clickhouse-common-static-{{ clickhouse_version }}.rpm` - т.е. clickhouse-common-static-22.3.3.44.rpm
+        * `clickhouse-client-{{ clickhouse_version }}.rpm` - т.е. clickhouse-client-22.3.3.44.rpm
+        * `clickhouse-server-{{ clickhouse_version }}.rpm` - т.е. clickhouse-server-22.3.3.44.rpm
+    * `notify: Start clickhouse service` - если задача будет в состоянии `changed`, то будет вызван `handler` по этому имени
+* `post_tasks:` - задачи, которые будут выполнены после всех `tasks`
+  * `block:` - блок случайно остался от отладки, когда были дополнительные шаги с просмотром значений переменных (`debug: vars: actual_services_state` и `fail: msg: "fail to wait"`), сейчас он не требуется
+  * Единственная задача блока - ожидаем запуска службы `name: Install Clickhouse | Wait for clickhouse to be running`
+    * `ansible.builtin.service_facts:` - собираем данные о всех службах с помощью модуля `service_facts`
+    * `register: actual_services_state` - записываем результат работы во вспомогательную переменную `actual_services_state`
+    * `until: actual_services_state.ansible_facts.services['clickhouse-server.service'].state == 'running'` - выполняем эту задачу до тех пор пока служба 'clickhouse-server.service' (оказалось нужно к названию clickhouse-server дописать .service) не окажется в состоянии 'running'
+    * `retries: 10` - максимальное количество повторов
+    * `delay: 500` - интервал в мс между повторами
+  * Завершающая задача - создание таблицы в базе данных `name: Install Clickhouse | Create database`
+    * `ansible.builtin.command: "clickhouse-client -q 'create database logs;'"` - выполняем баш-команду с помощью модуля `command`
+    * `register: create_db` - результат запоминаем во вспомогательную переменную `create_db`
+    * `failed_when: create_db.rc != 0 and create_db.rc !=82` - если поле rc результата не равно 0 (успешно выполнена) и не равно 82 (таблица уже существует), то считаем что задача завершена с ошибкой
+    * `changed_when: create_db.rc == 0` - если результат 0, то задача завершена со статусом `changed`
+
 ### Play для установки Vector
 * `name: Install Vector` - название Play
 * `hosts: vector` - хосты, на которых будет выполнено (см. [inventory/prod.yml](./ansible/inventory/prod.yml))
