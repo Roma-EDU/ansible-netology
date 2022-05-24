@@ -2,12 +2,18 @@
 clickhouse:
   hosts:
     clickhouse-01:
-      ansible_host: "51.250.2.168"
+      ansible_host: "51.250.69.201"
   vars:
     ansible_user: centos
 vector:
   hosts:
     application-01:
-      ansible_host: "51.250.82.119"
+      ansible_host: "51.250.78.115"
+  vars:
+    ansible_user: centos
+lighthouse:
+  hosts:
+    lighthouse-01:
+      ansible_host: "51.250.81.205"
   vars:
     ansible_user: centos
