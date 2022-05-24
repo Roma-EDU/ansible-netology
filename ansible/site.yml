@@ -103,6 +103,7 @@
         repo: "{{ lighthouse_git_repo }}"
         version: master
         dest: "{{ lighthouse_dir }}"
+      notify: Restart nginx service
     - name: Install Lighthouse | Create config
       become: true
       ansible.builtin.template:
