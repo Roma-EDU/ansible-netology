@@ -1,6 +1,6 @@
-# 08-ansible-02-playbook
+# 08-ansible-03-yandex
 
-Подробное описание выполнения по шагам [8.2. Работа с Playbook](https://github.com/Roma-EDU/devops-netology/tree/master/mnt-homeworks/08-ansible-02-playbook)
+Подробное описание выполнения по шагам [8.3. Использование Yandex Cloud](https://github.com/Roma-EDU/devops-netology/tree/master/mnt-homeworks/08-ansible-03-yandex)
 
 ## Описание Playbook
 
@@ -36,8 +36,7 @@
         * `clickhouse-server-{{ clickhouse_version }}.rpm` - т.е. clickhouse-server-22.3.3.44.rpm
     * `notify: Start clickhouse service` - если задача будет в состоянии `changed`, то будет вызван `handler` по этому имени
 * `post_tasks:` - задачи, которые будут выполнены после всех `tasks`
-  * `block:` - блок случайно остался от отладки, когда были дополнительные шаги с просмотром значений переменных (`debug: vars: actual_services_state` и `fail: msg: "fail to wait"`), сейчас он не требуется
-  * Единственная задача блока - ожидаем запуска службы `name: Install Clickhouse | Wait for clickhouse to be running`
+  * Ожидание запуска службы `name: Install Clickhouse | Wait for clickhouse to be running`
     * `ansible.builtin.service_facts:` - собираем данные о всех службах с помощью модуля `service_facts`
     * `register: actual_services_state` - записываем результат работы во вспомогательную переменную `actual_services_state`
     * `until: actual_services_state.ansible_facts.services['clickhouse-server.service'].state == 'running'` - выполняем эту задачу до тех пор пока служба 'clickhouse-server.service' (оказалось нужно к названию clickhouse-server дописать .service) не окажется в состоянии 'running'
@@ -62,7 +61,20 @@
   * `become: true` - повышаем привилегии до root
   * `ansible.builtin.yum:` - устанавливаем скачанный на предыдущем шаге пакет с помощью модуля yum
     * `name: "vector-{{ vector_version }}.rpm"` - файл `vector-0.21.1.rpm`
-        
+
+### Play для установки Nginx
+Вспомогательный шаг, поскольку для работы Lighthouse требуется веб-сервер
+Ключевые моменты:
+* Установка `epel-release` нужна, чтобы из этого репозитория загрузить актуальную версию nginx
+* Стандартная установка nginx и копирование его конфигурации с помощью шаблона [templates/nginx.conf.j2](./ansible/templates/nginx.conf.j2)
+* Если установился nginx или изменилась его конфигурация - с помощью handler перезапускаем службу nginx
+
+### Play для установки Lighthouse
+Ключевые моменты:
+* Для работы встроенной команды `ansible.builtin.git` в pre_tasks устанавливаем git
+* Скачиваем общедоступный репозиторий с lighthouse и копируем конфигрурацию [templates/lighthouse.conf.j2](./ansible/templates/lighthouse.conf.j2) для него в папку, за которой следит nginx
+* Если обновился lighthouse или изменилась его конфигурация - с помощью handler снова перезапускаем службу nginx
+
 ## Переменные 
 
 Переменные, значения которых со временем можно обновить:
@@ -70,3 +82,4 @@
 | --- | --- | --- | --- |
 | `clickhouse_version` | `22.3.3.44` | Строка | Версия ClickHouse |
 | `vector_version` | `0.21.1` | Строка | Версия Vector |
+| `lighthouse_git_repo` | `https://github.com/VKCOM/lighthouse.git` | Строка | Репозиторий, из которого устанавливается lighthouse |
