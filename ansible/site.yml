@@ -1,113 +1,20 @@
 ---
-# Clickhouse play
-- name: Install Clickhouse
-  hosts: clickhouse
-  handlers:
-    - name: Start clickhouse service
-      become: true
-      ansible.builtin.service:
-        name: clickhouse-server
-        state: restarted
-  tasks:
-    - block:
-        - name: Install Clickhouse | Download distrib noarch
-          ansible.builtin.get_url:
-            url: "https://packages.clickhouse.com/rpm/stable/{{ item }}-{{ clickhouse_version }}.noarch.rpm"
-            dest: "./{{ item }}-{{ clickhouse_version }}.rpm"
-            mode: 0644
-          with_items: "{{ clickhouse_packages_noarch }}"
-        - name: Install Clickhouse | Download distrib x86_64
-          ansible.builtin.get_url:
-            url: "https://packages.clickhouse.com/rpm/stable/{{ item }}-{{ clickhouse_version }}.x86_64.rpm"
-            dest: "./{{ item }}-{{ clickhouse_version }}.rpm"
-            mode: 0644
-          with_items: "{{ clickhouse_packages_x86_64 }}"
-    - name: Install Clickhouse | Install packages
-      become: true
-      ansible.builtin.yum:
-        name:
-          - clickhouse-common-static-{{ clickhouse_version }}.rpm
-          - clickhouse-client-{{ clickhouse_version }}.rpm
-          - clickhouse-server-{{ clickhouse_version }}.rpm
-      notify: Start clickhouse service
-  post_tasks:
-    - name: Install Clickhouse | Wait for clickhouse to be running
-      ansible.builtin.service_facts:
-      register: actual_services_state
-      until: actual_services_state.ansible_facts.services['clickhouse-server.service'].state == 'running'
-      retries: 10
-      delay: 500
-    - name: Install Clickhouse | Create database
-      ansible.builtin.command: "clickhouse-client -q 'create database logs;'"
-      register: create_db
-      failed_when: create_db.rc != 0 and create_db.rc !=82
-      changed_when: create_db.rc == 0
-# Vector play
-- name: Install Vector
-  hosts: vector
-  tasks:
-    - name: Install Vector | Download distrib
-      ansible.builtin.get_url:
-        url: "https://packages.timber.io/vector/{{ vector_version }}/vector-{{ vector_version }}-1.x86_64.rpm"
-        dest: "./vector-{{ vector_version }}.rpm"
-        mode: 0644
-    - name: Install Vector | Install packages
-      become: true
-      ansible.builtin.yum:
-        name: "vector-{{ vector_version }}.rpm"
-# Lighthouse play
-- name: Install Nginx
-  hosts: lighthouse
-  handlers:
-    - name: Start nginx service
-      become: true
-      ansible.builtin.service:
-        name: nginx
-        state: restarted
-  tasks:
-    - name: Install Nginx | Install epel
-      become: true
-      ansible.builtin.yum:
-        name: epel-release
-        state: present
-    - name: Install Nginx | Install nginx from epel
-      become: true
-      ansible.builtin.yum:
-        name: nginx
-        state: present
-      notify: Start nginx service
-    - name: Install Nginx | Create config
-      become: true
-      ansible.builtin.template:
-        src: nginx.conf.j2
-        dest: /etc/nginx/nginx.conf
-        mode: 0644
-      notify: Start nginx service
 - name: Install Lighthouse
   hosts: lighthouse
-  handlers:
-    - name: Restart nginx service
-      become: true
-      ansible.builtin.service:
-        name: nginx
-        state: restarted
   pre_tasks:
-    - name: Install Lighthouse | Install build dependencies
+    - name: Install Lighthouse | Install git
       become: true
       ansible.builtin.yum:
         name: git
         state: present
-  tasks:
-    - name: Install Lighthouse | Checkout from github
-      ansible.builtin.git:
-        repo: "{{ lighthouse_git_repo }}"
-        version: master
-        dest: "{{ lighthouse_dir }}"
-      notify: Restart nginx service
-    - name: Install Lighthouse | Create config
-      become: true
-      ansible.builtin.template:
-        src: lighthouse.conf.j2
-        dest: /etc/nginx/conf.d/default.conf
-        mode: 0644
-      notify: Restart nginx service
+  roles:
+    - nginx
+    - lighthouse
+- name: Install Vector
+  hosts: vector
+  roles:
+    - vector
+- name: Install Clickhouse
+  hosts: clickhouse
+  roles:
+    - clickhouse
