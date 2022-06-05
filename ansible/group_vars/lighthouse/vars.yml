@@ -1,5 +1,0 @@
----
-lighthouse_nginx_user: root
-lighthouse_git_repo: https://github.com/VKCOM/lighthouse.git
-lighthouse_dir: "/home/centos/lighthouse"
-lighthouse_access_log: lighthouse_access
